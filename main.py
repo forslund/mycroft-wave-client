@@ -24,8 +24,10 @@ from mycroft.stt import STTFactory
 from mycroft.configuration import ConfigurationManager
 from mycroft.util import getLogger
 from mycroft.messagebus.client.ws import WebsocketClient
+from mycroft.messagebus.message import Message
 import speech_recognition as sr
 import time
+from os import remove
 
 logger = getLogger("WavFileClient")
 ws = None
@@ -50,27 +52,49 @@ def read_wave_file(wave_file_path):
 
 
 class FileConsumer(Thread):
-    def __init__(self, file_location='/tmp/mycroft_in.wav'):
+    def __init__(self, file_location='/tmp/mycroft_in.wav', emitter=None):
         super(FileConsumer, self).__init__()
         self.path = file_location
         self.stop_event = Event()
+        self.stt = None
+        self.emitter = emitter
 
     def run(self):
         logger.info("Creating SST interface")
-        stt = STTFactory.create()
-        
+        self.stt = STTFactory.create()
+        self.emitter.on("stt.request", self.handle_external_request)
         while not self.stop_event.is_set():
             logger.info('Looping')
             if exists(self.path):
                 audio = read_wave_file(self.path)
-                text = stt.execute(audio).lower().strip()
+                text = self.stt.execute(audio).lower().strip()
                 logger.info(text)
-                
-                remove(file_location)
+                remove(self.path)
             time.sleep(0.5)
+
+    def handle_external_request(self, message):
+        file = message.data.get("File")
+        if self.stt is None:
+            error = "STT initialization failure"
+            self.emitter.emit(
+                Message("stt.error", {"error": error}))
+        elif not file:
+            error = "No file provided for transcription"
+            self.emitter.emit(
+                Message("stt.error", {"error": error}))
+        elif not exists(file):
+            error = "Invalid file path provided for transcription"
+            self.emitter.emit(
+                Message("stt.error", {"error": error}))
+        else:
+            audio = read_wave_file(file)
+            transcript = self.stt.execute(audio).lower().strip()
+            self.emitter.emit(Message("stt.reply",
+                                      {"transcription": transcript}))
 
     def stop(self):
         self.stop_event.set()
+
 
 def main():
     global ws
@@ -82,7 +106,7 @@ def main():
     event_thread.setDaemon(True)
     event_thread.start()
     try:
-        file_consumer = FileConsumer()
+        file_consumer = FileConsumer(emitter=ws)
         file_consumer.start()
         while True:
             time.sleep(100)
