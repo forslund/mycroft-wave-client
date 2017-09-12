@@ -29,6 +29,8 @@ import speech_recognition as sr
 import time
 from os import remove
 
+authors = ["forslund", "jarbas"]
+
 logger = getLogger("WavFileClient")
 ws = None
 
@@ -105,8 +107,9 @@ def main():
     event_thread = Thread(target=connect)
     event_thread.setDaemon(True)
     event_thread.start()
+    config = config.get("wav_client", {"path": "/tmp/mycroft_in.wav"})
     try:
-        file_consumer = FileConsumer(emitter=ws)
+        file_consumer = FileConsumer(file_location=config["path"], emitter=ws)
         file_consumer.start()
         while True:
             time.sleep(100)
