@@ -66,11 +66,13 @@ class FileConsumer(Thread):
         self.stt = STTFactory.create()
         self.emitter.on("stt.request", self.handle_external_request)
         while not self.stop_event.is_set():
-            logger.info('Looping')
             if exists(self.path):
                 audio = read_wave_file(self.path)
                 text = self.stt.execute(audio).lower().strip()
-                logger.info(text)
+                self.emitter.emit(
+                    Message("recognizer_loop:utterance", 
+                           {"utterances": [text]},
+                           {"source": "wav_client"}))
                 remove(self.path)
             time.sleep(0.5)
 
