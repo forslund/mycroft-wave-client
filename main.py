@@ -22,7 +22,7 @@ from threading import Thread, Lock, Event
 from os.path import exists
 from mycroft.stt import STTFactory
 from mycroft.configuration import ConfigurationManager
-from mycroft.util import getLogger
+from mycroft.util.log import LOG
 from mycroft.messagebus.client.ws import WebsocketClient
 from mycroft.messagebus.message import Message
 import speech_recognition as sr
@@ -31,7 +31,6 @@ from os import remove
 
 authors = ["forslund", "jarbas"]
 
-logger = getLogger("WavFileClient")
 ws = None
 
 config = ConfigurationManager.get()
@@ -62,7 +61,7 @@ class FileConsumer(Thread):
         self.emitter = emitter
 
     def run(self):
-        logger.info("Creating SST interface")
+        LOG.info("Creating SST interface")
         self.stt = STTFactory.create()
         self.emitter.on("stt.request", self.handle_external_request)
         while not self.stop_event.is_set():
@@ -116,7 +115,7 @@ def main():
         while True:
             time.sleep(100)
     except KeyboardInterrupt, e:
-        logger.exception(e)
+        LOG.exception(e)
         file_consumer.stop()
         file_consumer.join()
         sys.exit()
